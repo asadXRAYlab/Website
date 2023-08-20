@@ -1,0 +1,2 @@
+gunicorn==20.1.0
+label-studio-ml==2.0
