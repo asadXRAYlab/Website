@@ -9,8 +9,7 @@ from label_studio_ml.utils import get_image_local_path, InMemoryLRUDictCache
 
 logger = logging.getLogger(__name__)
 
-# VITH_CHECKPOINT = os.environ.get("VITH_CHECKPOINT", "sam_vit_h_4b8939.pth")
-VITH_CHECKPOINT = os.environ.get("VITH_CHECKPOINT", "sam_vit_b_01ec64.pth")
+VITH_CHECKPOINT = os.environ.get("VITB_CHECKPOINT", "sam_vit_b_01ec64.pth")
 ONNX_CHECKPOINT = os.environ.get("ONNX_CHECKPOINT", "sam_onnx_quantized_example.onnx")
 MOBILESAM_CHECKPOINT = os.environ.get("MOBILESAM_CHECKPOINT", "mobile_sam.pt")
 LABEL_STUDIO_ACCESS_TOKEN = os.environ.get("LABEL_STUDIO_ACCESS_TOKEN")
@@ -55,7 +54,7 @@ class SAMPredictor(object):
                 raise FileNotFoundError("VITH_CHECKPOINT is not set: please set it to the path to the SAM checkpoint")
 
             logger.info(f"Using SAM checkpoint {self.model_checkpoint}")
-            reg_key = "vit_h"
+            reg_key = "vit_b"
 
         elif model_choice == 'MobileSAM':
             from mobile_sam import SamPredictor, sam_model_registry
