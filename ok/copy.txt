@@ -1,0 +1,129 @@
+from django.shortcuts import render
+from django.http import JsonResponse
+from django.http import HttpResponse
+# Create your views here.
+from .lightning_inference import infer
+
+
+import cv2.dnn
+import numpy as np
+
+from ultralytics.utils import ROOT, yaml_load
+from ultralytics.utils.checks import check_yaml
+
+CLASSES = yaml_load(check_yaml('coco128.yaml'))['names']
+colors = np.random.uniform(0, 255, size=(len(CLASSES), 3))
+
+def draw_bounding_box(img, class_id, confidence, x, y, x_plus_w, y_plus_h):
+    label = f'{CLASSES[class_id]} ({confidence:.2f})'
+    color = colors[class_id]
+    cv2.rectangle(img, (x, y), (x_plus_w, y_plus_h), color, 2)
+    cv2.putText(img, label, (x - 10, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+def yolo(request):
+    onnx_model = './yolov8s.onnx'
+    input_image = './bus.jpg'
+    #model: cv2.dnn.Net = cv2.dnn.readNetFromONNX(onnx_model)
+    model = cv2.dnn.readNetFromONNX(onnx_model)
+    original_image: np.ndarray = cv2.imread(input_image)
+    [height, width, _] = original_image.shape
+    length = max((height, width))
+    image = np.zeros((length, length, 3), np.uint8)
+    image[0:height, 0:width] = original_image
+    scale = length / 640
+
+    blob = cv2.dnn.blobFromImage(image, scalefactor=1 / 255, size=(640, 640), swapRB=True)
+    model.setInput(blob)
+    outputs = model.forward()
+
+    outputs = np.array([cv2.transpose(outputs[0])])
+    rows = outputs.shape[1]
+
+    boxes = []
+    scores = []
+    class_ids = []
+
+    for i in range(rows):
+        classes_scores = outputs[0][i][4:]
+        (minScore, maxScore, minClassLoc, (x, maxClassIndex)) = cv2.minMaxLoc(classes_scores)
+        if maxScore >= 0.25:
+            box = [
+                outputs[0][i][0] - (0.5 * outputs[0][i][2]), outputs[0][i][1] - (0.5 * outputs[0][i][3]),
+                outputs[0][i][2], outputs[0][i][3]]
+            boxes.append(box)
+            scores.append(maxScore)
+            class_ids.append(maxClassIndex)
+
+    result_boxes = cv2.dnn.NMSBoxes(boxes, scores, 0.25, 0.45, 0.5)
+
+    detections = []
+    for i in range(len(result_boxes)):
+        index = result_boxes[i]
+        box = boxes[index]
+        detection = {
+            'class_id': class_ids[index],
+            'class_name': CLASSES[class_ids[index]],
+            'confidence': scores[index],
+            'box': box,
+            'scale': scale}
+        detections.append(detection)
+        draw_bounding_box(original_image, class_ids[index], scores[index], round(box[0] * scale),
+                          round(box[1] * scale), round((box[0] + box[2]) * scale),
+                          round((box[1] + box[3]) * scale))
+
+    cv2.imwrite('C:\\Users\\asad3\\pop\\ok\\static\\output.jpg', original_image)  # Save the annotated image
+    return render(request, 'detections.html', {'detections': detections})
+
+import numpy as np
+
+def process_results(inference_results):
+    # Process the inference results to get the required information for the template
+    # You may need to adjust this function based on your specific model's output and anomaly detection method.
+
+    result_dict = inference_results[0]  # Get the dictionary from the list
+
+    pred_labels = np.array(result_dict['pred_labels'])  # Convert to numpy array
+
+    if pred_labels.ndim == 2:
+        pred_labels = pred_labels[:, 0]  # Flatten the nested structure if present
+
+    if any(pred_labels):
+        # If anomalies are detected, return the confidence score, bounding box, and anomaly map
+        return {
+            'anomalies_detected': True,
+            'confidence_score': result_dict['pred_scores'][0].item(),
+            'bounding_box': result_dict['pred_boxes'][0].tolist(),
+            'image_path': result_dict['image_path'][0],
+            'anomaly_map': result_dict['anomaly_maps'][0].tolist()
+        }
+    else:
+        # If no anomalies are detected
+        return {
+            'anomalies_detected': False,
+            'image_path': result_dict['image_path'][0]
+        }
+    
+
+import os
+def anomaly_detection(request):
+    # Replace 'path/to/your/model.pth' and 'path/to/your/config.yaml' with the actual paths of your model and config files.
+    model_path = "C:\\Users\\asad3\\pop\\anomalib\\results\\padim\mvtec\\bottle\\run\\weights\\lightning\\model.ckpt"
+    config_path = "C:\\Users\\asad3\\pop\\anomalib\\src\\anomalib\\models\\padim\\config.yaml"
+
+    # Get the image path from the static files or any other location in your Django project.
+    image_path = os.path.join("C:\\Users\\asad3\\pop\\anomalib\\datasets\\MVTec\\bottle\\test\\broken_large\\001.png")
+
+    # Perform inference and get the results
+    # You can store the results in a variable or return them as needed.
+    inference_results = infer(model_path, config_path, image_path)
+
+    results = process_results(inference_results)
+    
+    # Render the results to the template
+    return render(request, 'anomaly_detection_template.html', {'results': results})
+  
+
+def home(request):
+  
+
+    return HttpResponse("Home function executed successfully!")

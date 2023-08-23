@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Anomaly Detection Results</title>
+</head>
+
+<body>
+    <h1>Anomaly Detection Results</h1>
+
+    <h2>Input Image</h2>
+    <img src="{{ results.image_path }}" alt="Input Image"> {% if results.anomalies_detected %}
+    <h2>Detected Anomalies</h2>
+    <p>Confidence Score: {{ results.confidence_score }}</p>
+    <p>Bounding Box: {{ results.bounding_box }}</p>
+
+    <!-- Display the anomaly map overlay on the input image -->
+    <img src="{{ results.image_path }}" alt="Anomaly Map" style="position: relative;">
+    <img src="{{ results.anomaly_map }}" alt="Anomaly Map Overlay" style="position: absolute; top: 0; left: 0; opacity: 0.5;" usemap="#anomaly-map">
+
+    <!-- Define the anomaly map overlay coordinates -->
+    <map name="anomaly-map">
+            <area shape="rect" coords="{{ results.bounding_box.0 }},{{ results.bounding_box.1 }},{{ results.bounding_box.2 }},{{ results.bounding_box.3 }}" href="#" alt="Detected Anomaly">
+        </map>
+
+    <h2>Anomaly Map</h2>
+    <img src="{{ results.anomaly_map }}" alt="Anomaly Map"> {% else %}
+    <p>No anomalies detected.</p>
+    {% endif %}
+</body>
+
+</html>
