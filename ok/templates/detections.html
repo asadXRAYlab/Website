@@ -1,0 +1,19 @@
+{% load static %}
+
+<html>
+
+<body>
+    <h1>Detections</h1>
+    {% for detection in detections %}
+    <p>Class ID: {{ detection.class_id }}</p>
+    <p>Class Name: {{ detection.class_name }}</p>
+    <p>Confidence: {{ detection.confidence }}</p>
+    <p>Box: {{ detection.box }}</p>
+    <p>Scale: {{ detection.scale }}</p>
+    {% endfor %}
+    <img src="{% static 'output.jpg' %}" alt="Detections">
+
+
+</body>
+
+</html>
