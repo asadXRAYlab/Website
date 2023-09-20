@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from django.http import HttpResponse
 # Create your views here.
-from .lightning_inference import infer
+from .torch_inference import infer
 from django.views.decorators.csrf import csrf_exempt
 from django.core.serializers.json import DjangoJSONEncoder
 import numpy as np
@@ -156,69 +156,9 @@ import io
 import base64
 from PIL import Image
 
-def process_results(inference_results):
-    try:
-        result_dict = inference_results[0]  # Get the dictionary from the list
-        image_path = result_dict['image_path'][0]
-        image = Image.open(image_path)
-
-        pred_labels = np.array(result_dict['pred_labels'])  # Convert to numpy array
-
-        if pred_labels.ndim == 2:
-            pred_labels = pred_labels[:, 0]  # Flatten the nested structure if present
-
-        if any(pred_labels):
-            # If anomalies are detected, return the confidence score, bounding box, and anomaly map
-            anomaly_map = result_dict['anomaly_maps'][0]
-            
-            # Convert the anomaly map tensor to a NumPy array
-            anomaly_map = anomaly_map.cpu().detach().numpy()
-            
-            # Ensure that the anomaly_map is 2D (grayscale)
-            if anomaly_map.ndim == 3:
-                anomaly_map = anomaly_map[0]  # Select the first channel if it's a color map
-            
-            # Normalize anomaly_map to the range [0, 255] and convert it to a grayscale image
-            anomaly_map = (anomaly_map * 255).astype('uint8')
-            anomaly_map_image = Image.fromarray(anomaly_map, mode='L')
-
-            # Convert the anomaly map image to a base64 data URI
-            buffered = io.BytesIO()
-            anomaly_map_image.save(buffered, format="PNG")
-            anomaly_map_data_uri = base64.b64encode(buffered.getvalue()).decode()
-
-            return {
-                'anomalies_detected': True,
-                'confidence_score': result_dict['pred_scores'][0].item(),
-                'bounding_box': result_dict['pred_boxes'][0].tolist(),
-                'image_path': image_path,
-                'anomaly_map_data_uri': anomaly_map_data_uri
-            }
-        else:
-            # If no anomalies are detected
-            return {
-                'anomalies_detected': False,
-                'image_path': image_path
-            }
-    except Exception as e:
-        error_message = str(e)
-        return {'error': error_message}
 
 
 
-def anomaly_detection(image_bytes, model_path, config_path):
-    # Convert the image_bytes to a NumPy array
-    image_array = np.frombuffer(image_bytes, np.uint8)
-    image_path = os.path.join(tempfile.gettempdir(), "temp_image.jpg")
-    
-    with open(image_path, "wb") as img_file:
-        img_file.write(image_array)
-
-    inference_results = infer(model_path, config_path, image_path)
-        
-    results = process_results(inference_results)
-    
-    return results
   
 import io
 import torch
@@ -232,16 +172,38 @@ def anomaly_detection_api(request):
                 return JsonResponse({'error': 'No image data provided'}, status=400)
 
             model_path = request.POST.get('model_path')
-            config_path = request.POST.get('config_path')
 
-            if model_path is None or config_path is None:
-                return JsonResponse({'error': 'Model path or config path not provided'}, status=400)
+
+            if model_path is None:
+                return JsonResponse({'error': 'Model path path not provided'}, status=400)
 
             image_bytes = image_data.read()
+            image_array = np.frombuffer(image_bytes, np.uint8)
+            image_path = os.path.join(tempfile.gettempdir(), "temp_image.jpg")
+    
+            with open(image_path, "wb") as img_file:
+                img_file.write(image_array)
 
-            results = anomaly_detection(image_bytes, model_path, config_path)
-
-            return JsonResponse(results)
+            output='C:\\Users\\asad3\\Documents\\xis\\usaisoft-platform-backend\\ok\\results'
+            train_args = Namespace(
+                weights=model_path,
+                input=image_path,
+                output=output,
+                task='segmentation',
+                visualization_mode='full',
+                device='auto',
+                log_level="INFO"
+            )
+            results = infer(train_args)
+            print(results)
+            
+            image = Image.fromarray(results.astype('uint8'))
+            image_buffer = io.BytesIO()
+            image.save(image_buffer, format="PNG")
+            image_buffer.seek(0)
+            response = HttpResponse(image_buffer.read(), content_type="image/png")
+            return response 
+    
         except Exception as e:
             error_message = str(e)
             return JsonResponse({'error': error_message}, status=500)
