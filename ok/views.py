@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from django.http import JsonResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from django.http import HttpResponse
 # Create your views here.
 from .torch_inference import infer
@@ -111,7 +111,7 @@ def train_yolo(request):
             # Training using the updated data.yaml file
             results = model.train(
                 data=yaml_path,
-                epochs=1,
+                epochs=30,
                 imgsz=256
             )
 
@@ -150,16 +150,10 @@ from PIL import Image
 import tempfile
 import base64
 import io
-
 import numpy as np
 import io
 import base64
 from PIL import Image
-
-
-
-
-  
 import io
 import torch
 
@@ -190,12 +184,11 @@ def anomaly_detection_api(request):
                 input=image_path,
                 output=output,
                 task='segmentation',
-                visualization_mode='full',
+                visualization_mode='simple',
                 device='auto',
                 log_level="INFO"
             )
             results = infer(train_args)
-            print(results)
             
             image = Image.fromarray(results.astype('uint8'))
             image_buffer = io.BytesIO()
@@ -357,3 +350,83 @@ def home(request):
 
 
 ############################################################################################################################
+
+# myapp/views.py
+
+from django.http import HttpResponse
+from django.views.decorators.http import require_http_methods
+import cv2
+import time
+
+
+model = YOLO("yolov8n.pt")
+
+def webcam(request):
+    return render(request, 'webcam_app/webcam.html')
+
+def video_feed(request):
+    #if request.method == 'POST' or request.method == 'GET':
+        def generate_frames():
+
+            cap = cv2.VideoCapture(0)
+            frame_count = 0
+            while True:
+                success, frame = cap.read()
+                if not success:
+                    break
+
+                # Process frame with YOLO
+                results = model(frame)
+
+                annotated_frame = results[0].plot()  # Use result[0].plot() to annotate the frame
+
+                _, buffer = cv2.imencode('.jpg', annotated_frame)
+
+                # Convert frame to bytes for streaming
+                frame_bytes = buffer.tobytes()
+                frame_count += 1
+                
+                yield (b'--frame\r\n'
+                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+                
+
+            cap.release()
+
+        return StreamingHttpResponse(generate_frames(), content_type='multipart/x-mixed-replace; boundary=frame')
+    #return HttpResponse('Invalid request method', status=405)
+
+
+from anomalib.deploy import TorchInferencer
+from anomalib.post_processing import Visualizer
+
+
+def webcam(request):
+    return render(request, 'webcam_app/anomalib_webcam.html')
+
+def anomalib_cam(request):
+        inferencer = TorchInferencer(path='C:\\Users\\asad3\\Documents\\xis\\usaisoft-platform-backend\\results\\cfa\\Paper\\run\\weights\\torch\\model.pt', device='auto')
+        visualizer = Visualizer(mode='simple', task='segmentation')
+    #if request.method == 'POST' or request.method == 'GET':
+        def generate_frames():
+
+            cap = cv2.VideoCapture(0)
+            while True:
+                success, frame = cap.read()
+                if not success:
+                    break
+
+                # Process frame with YOLO
+                predictions = inferencer.predict(frame)
+                annotated_frame = visualizer.visualize_image(predictions) 
+                _, buffer = cv2.imencode('.jpg', annotated_frame)
+
+                frame_bytes = buffer.tobytes()
+                
+                
+                yield (b'--frame\r\n'
+                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+        
+
+            cap.release()
+
+        return StreamingHttpResponse(generate_frames(), content_type='multipart/x-mixed-replace; boundary=frame')

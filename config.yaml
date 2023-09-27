@@ -1,18 +1,18 @@
 dataset:
-    name: hazelnut
+    name: Paper
     format: folder
     root: C:\Users\asad3\Downloads\yoloproject\Dataset
     normal_dir: good # name of the folder containing normal images.
-    abnormal_dir: colour # name of the folder containing abnormal images.
+    abnormal_dir: colour
     task: segmentation # classification or segmentation
     mask_dir: mask
     normal_test_dir: null # optional
     extensions: null
     split_ratio: 0.2  # normal images ratio to create a test split
     seed: 0
-    image_size: 256
-    train_batch_size: 32
-    eval_batch_size: 32
+    image_size: 512
+    train_batch_size: 2
+    eval_batch_size: 2
     num_workers: 8
     normalization: imagenet # data distribution to which the images will be normalized
     test_split_mode: from_dir # options [from_dir, synthetic]
@@ -72,7 +72,7 @@ logging:
   log_graph: false # Logs the model graph to respective logger.
 
 optimization:
-  export_mode: null # options: torch, onnx, openvino
+  export_mode: torch # options: torch, onnx, openvino
 
 # PL Trainer Args. Don't add extra parameter here.
 trainer:

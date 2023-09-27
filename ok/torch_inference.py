@@ -31,21 +31,15 @@ def infer(args: Namespace) -> None:
         """
 
         torch.set_grad_enabled(False)
-        print(args.weights)
-        print(args.device)
-        print(args.visualization_mode)
-        print(args.task)
-        #print(args.input)
         # Create the inferencer and visualizer.
         inferencer = TorchInferencer(path=args.weights, device=args.device)
         visualizer = Visualizer(mode=args.visualization_mode, task=args.task)
-        print('hello')
+
         filenames = get_image_filenames(path=args.input)
         for filename in filenames:
             image = read_image(filename)
             predictions = inferencer.predict(image=image)
             output = visualizer.visualize_image(predictions)
-            print('hello')
         
             if args.output is None and args.show is False:
                 warnings.warn(
