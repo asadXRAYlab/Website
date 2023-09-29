@@ -84,17 +84,14 @@ def yolo_api(request):
 def train_yolo(request):
     if request.method == 'POST':
         try:
-            # Handle the uploaded YAML file
             yaml_file = request.FILES.get('yaml_file')
             if not yaml_file:
                 return JsonResponse({'status': 'error', 'message': 'No YAML file uploaded'})
-
-            # Get dataset path from user input
             dataset_path = request.POST.get('dataset_path')
             if not dataset_path:
                 return JsonResponse({'status': 'error', 'message': 'No dataset path provided'})
-
-            # Save the uploaded YAML file
+            epoch=request.POST.get('epoch')
+            
             upload_dir = 'C:\\Users\\asad3\\pop\\model_results'  # Change this to your desired upload directory
             os.makedirs(upload_dir, exist_ok=True)
             yaml_path = os.path.join(upload_dir, yaml_file.name)
@@ -117,7 +114,7 @@ def train_yolo(request):
             # Training using the updated data.yaml file
             results = model.train(
                 data=yaml_path,
-                epochs=30,
+                epochs=int(epoch),
                 imgsz=256
             )
 
@@ -379,78 +376,81 @@ import time
 
 @require_http_methods(["GET", "POST"])
 def run(request):
-        model_path = request.FILES.get('model')  # Change 'model_path' to 'model'
-        print(model_path)
-        current_directory = os.getcwd()
-        model_filename = model_path.name
-        model_asd = os.path.join(current_directory, model_filename)
-        with open(model_asd, 'wb') as destination:
-            for chunk in model_path.chunks():
-                destination.write(chunk)
-        print(f'Model file received and saved at: {model_asd}')
-        model = YOLO(model_asd)
-        def generate_frames():
-                cap = cv2.VideoCapture(0) 
+    if request.method == "POST":
+        model_path = request.FILES.get('model')
+        
+        if model_path:
+            # Process the uploaded model file
+            current_directory = os.getcwd()
+            model_filename = model_path.name
+            model_asd = os.path.join(current_directory, model_filename)
+            
+            with open(model_asd, 'wb') as destination:
+                for chunk in model_path.chunks():
+                    destination.write(chunk)
+            
+            print(f'Model file received and saved at: {model_asd}')
+            model = YOLO(model_asd)
+
+            def generate_frames():
+                cap = cv2.VideoCapture(0)
                 while cap.isOpened():
                     success, frame = cap.read()
                     if success:
-
                         results = model(frame)
-
-                        annotated_frame = results[0].plot()  # Use result[0].plot() to annotate the frame
-
+                        annotated_frame = results[0].plot()
                         _, buffer = cv2.imencode('.jpg', annotated_frame)
-
-                        # Convert frame to bytes for streaming
                         frame_bytes = buffer.tobytes()
-                        
                         yield (b'--frame\r\n'
-                            b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-                    
+                               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
-        return StreamingHttpResponse(generate_frames(), content_type='multipart/x-mixed-replace; boundary=frame')
+            return StreamingHttpResponse(generate_frames(), content_type='multipart/x-mixed-replace; boundary=frame')
     
-    #return HttpResponse('Invalid request method', status=405)
+    # Render the initial form page for GET requests
+    return render(request, 'Yolo_live_inference.html')
 
 
 from anomalib.deploy import TorchInferencer
 from anomalib.post_processing import Visualizer
 
 
-#def webcam(request):
-#    return render(request, 'webcam_app/anomalib_webcam.html')
+
 @require_http_methods(["GET", "POST"])
 def anomalib_cam(request):
+    if request.method == "POST":
+        model_path = request.FILES.get('model')
         
-        model_path = request.FILES.get('model')  # Change 'model_path' to 'model'
-        print(model_path)
-        current_directory = os.getcwd()
-        model_filename = model_path.name
-        model_asd = os.path.join(current_directory, model_filename)
-        with open(model_asd, 'wb') as destination:
-            for chunk in model_path.chunks():
-                destination.write(chunk)
-        print(f'Model file received and saved at: {model_asd}')
+        if model_path:
+            # Process the uploaded model file
+            current_directory = os.getcwd()
+            model_filename = model_path.name
+            model_asd = os.path.join(current_directory, model_filename)
+            
+            with open(model_asd, 'wb') as destination:
+                for chunk in model_path.chunks():
+                    destination.write(chunk)
+            
+            print(f'Model file received and saved at: {model_asd}')
         
-        inferencer = TorchInferencer(path=model_asd, device='auto')
-        visualizer = Visualizer(mode='simple', task='segmentation')
-    #if request.method == 'POST' or request.method == 'GET':
-        def generate_frames():
+            inferencer = TorchInferencer(path=model_asd, device='auto')
+            visualizer = Visualizer(mode='simple', task='segmentation')
+            
+            def generate_frames():
+                cap = cv2.VideoCapture(0) 
+                while cap.isOpened():
+                    success, frame = cap.read()
+                    if success:
 
-            cap = cv2.VideoCapture(0) 
-            while cap.isOpened():
-                success, frame = cap.read()
-                if success:
+                        predictions = inferencer.predict(frame)
+                        annotated_frame = visualizer.visualize_image(predictions) 
 
-                    predictions = inferencer.predict(frame)
-                    annotated_frame = visualizer.visualize_image(predictions) 
+                        _, buffer = cv2.imencode('.jpg', annotated_frame)
 
-                    _, buffer = cv2.imencode('.jpg', annotated_frame)
-
-                    frame_bytes = buffer.tobytes()
-                    
-                    yield (b'--frame\r\n'
-                        b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-
+                        frame_bytes = buffer.tobytes()
+                        
+                        yield (b'--frame\r\n'
+                            b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
         return StreamingHttpResponse(generate_frames(), content_type='multipart/x-mixed-replace; boundary=frame')
+    
+    return render(request, 'Anomalib_live_inference.html')
