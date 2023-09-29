@@ -29,18 +29,17 @@ def infer(args: Namespace) -> None:
         Args:
             args (Namespace): The arguments from the command line.
         """
-
+        print(args.weights)
         torch.set_grad_enabled(False)
         # Create the inferencer and visualizer.
+        
         inferencer = TorchInferencer(path=args.weights, device=args.device)
         visualizer = Visualizer(mode=args.visualization_mode, task=args.task)
-
         filenames = get_image_filenames(path=args.input)
         for filename in filenames:
             image = read_image(filename)
             predictions = inferencer.predict(image=image)
             output = visualizer.visualize_image(predictions)
-        
             if args.output is None and args.show is False:
                 warnings.warn(
                     "Neither output path is provided nor show flag is set. Inferencer will run but return nothing."

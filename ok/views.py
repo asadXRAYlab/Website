@@ -45,15 +45,21 @@ def yolo(image_bytes, model_path):
 
 def yolo_api(request):
     if request.method == 'POST':
-        if 'image' in request.FILES and 'model_path' in request.POST:
+        if 'model_path' in request.FILES and 'image' in request.FILES:
+            model_path = request.FILES['model_path']
             image = request.FILES['image'].read()
-            model_path = request.POST['model_path']
-             
-            print('Received Model Path:', model_path)  # Debugging print
+
+            current_directory = os.getcwd()
+            model_filename = model_path.name
+            model_path_asd = os.path.join(current_directory, model_filename)
+            with open(model_path_asd, 'wb') as destination:
+                for chunk in model_path.chunks():
+                    destination.write(chunk)
+            print(f'Model file received and saved at: {model_path_asd}')
 
             try:
-                detections = yolo(image, model_path)
-
+                detections = yolo(image, model_path_asd)
+    
                 # Save the annotated image to a temporary file
                 temp_output_path = os.path.join(tempfile.gettempdir(), 'output.jpg')
                 cv2.imwrite(temp_output_path, detections)
@@ -165,11 +171,20 @@ def anomaly_detection_api(request):
             if image_data is None:
                 return JsonResponse({'error': 'No image data provided'}, status=400)
 
-            model_path = request.POST.get('model_path')
-
+            model_path = request.FILES.get('model_path')
+            print(model_path)
 
             if model_path is None:
                 return JsonResponse({'error': 'Model path path not provided'}, status=400)
+            
+
+            current_directory = os.getcwd()
+            model_filename = model_path.name
+            model_path_asd = os.path.join(current_directory, model_filename)
+            with open(model_path_asd, 'wb') as destination:
+                for chunk in model_path.chunks():
+                    destination.write(chunk)
+            print(f'Model file received and saved at: {model_path_asd}')
 
             image_bytes = image_data.read()
             image_array = np.frombuffer(image_bytes, np.uint8)
@@ -177,10 +192,9 @@ def anomaly_detection_api(request):
     
             with open(image_path, "wb") as img_file:
                 img_file.write(image_array)
-
             output='C:\\Users\\asad3\\Documents\\xis\\usaisoft-platform-backend\\ok\\results'
             train_args = Namespace(
-                weights=model_path,
+                weights=model_path_asd,
                 input=image_path,
                 output=output,
                 task='segmentation',
@@ -357,146 +371,45 @@ from django.http import HttpResponse
 from django.views.decorators.http import require_http_methods
 import cv2
 import time
-from pyueye import ueye
 
-model = YOLO("yolov8n.pt")
 
-def webcam(request):
-    return render(request, 'webcam_app/webcam.html')
 
-def video_feed(request):
-    #if request.method == 'POST' or request.method == 'GET':
+
+
+
+@require_http_methods(["GET", "POST"])
+def run(request):
+        model_path = request.FILES.get('model')  # Change 'model_path' to 'model'
+        print(model_path)
+        current_directory = os.getcwd()
+        model_filename = model_path.name
+        model_asd = os.path.join(current_directory, model_filename)
+        with open(model_asd, 'wb') as destination:
+            for chunk in model_path.chunks():
+                destination.write(chunk)
+        print(f'Model file received and saved at: {model_asd}')
+        model = YOLO(model_asd)
         def generate_frames():
+                cap = cv2.VideoCapture(0) 
+                while cap.isOpened():
+                    success, frame = cap.read()
+                    if success:
 
-            hCam = ueye.HIDS(0)             #0: first available camera;  1-254: The camera with the specified camera ID
-            sInfo = ueye.SENSORINFO()
-            cInfo = ueye.CAMINFO()
-            pcImageMemory = ueye.c_mem_p()
-            MemID = ueye.int()
-            rectAOI = ueye.IS_RECT()
-            pitch = ueye.INT()
-            nBitsPerPixel = ueye.INT(24)    #24: bits per pixel for color mode; take 8 bits per pixel for monochrome
-            channels = 3                    #3: channels for color mode(RGB); take 1 channel for monochrome
-            m_nColorMode = ueye.INT()		# Y8/RGB16/RGB24/REG32
-            bytes_per_pixel = int(nBitsPerPixel / 8)
+                        results = model(frame)
 
-            nRet = ueye.is_InitCamera(hCam, None)
-            if nRet != ueye.IS_SUCCESS:
-                print("is_InitCamera ERROR")
+                        annotated_frame = results[0].plot()  # Use result[0].plot() to annotate the frame
 
-            nRet = ueye.is_GetCameraInfo(hCam, cInfo)
-            if nRet != ueye.IS_SUCCESS:
-                print("is_GetCameraInfo ERROR")
+                        _, buffer = cv2.imencode('.jpg', annotated_frame)
 
-            nRet = ueye.is_GetSensorInfo(hCam, sInfo)
-            if nRet != ueye.IS_SUCCESS:
-                print("is_GetSensorInfo ERROR")
-
-            nRet = ueye.is_ResetToDefault( hCam)
-            if nRet != ueye.IS_SUCCESS:
-                print("is_ResetToDefault ERROR")
-
-            nRet = ueye.is_SetDisplayMode(hCam, ueye.IS_SET_DM_DIB)
-
-            if int.from_bytes(sInfo.nColorMode.value, byteorder='big') == ueye.IS_COLORMODE_BAYER:
-            # setup the color depth to the current windows setting
-                ueye.is_GetColorDepth(hCam, nBitsPerPixel, m_nColorMode)
-                bytes_per_pixel = int(nBitsPerPixel / 8)
-                print("IS_COLORMODE_BAYER: ", )
-                print("\tm_nColorMode: \t\t", m_nColorMode)
-                print("\tnBitsPerPixel: \t\t", nBitsPerPixel)
-                print("\tbytes_per_pixel: \t\t", bytes_per_pixel)
-                print()
-
-            elif int.from_bytes(sInfo.nColorMode.value, byteorder='big') == ueye.IS_COLORMODE_CBYCRY:
-                # for color camera models use RGB32 mode
-                m_nColorMode = ueye.IS_CM_BGRA8_PACKED
-                nBitsPerPixel = ueye.INT(32)
-                bytes_per_pixel = int(nBitsPerPixel / 8)
-                print("IS_COLORMODE_CBYCRY: ", )
-                print("\tm_nColorMode: \t\t", m_nColorMode)
-                print("\tnBitsPerPixel: \t\t", nBitsPerPixel)
-                print("\tbytes_per_pixel: \t\t", bytes_per_pixel)
-                print()
-
-            elif int.from_bytes(sInfo.nColorMode.value, byteorder='big') == ueye.IS_COLORMODE_MONOCHROME:
-                # for color camera models use RGB32 mode
-                m_nColorMode = ueye.IS_CM_MONO8
-                nBitsPerPixel = ueye.INT(8)
-                bytes_per_pixel = int(nBitsPerPixel / 8)
-                print("IS_COLORMODE_MONOCHROME: ", )
-                print("\tm_nColorMode: \t\t", m_nColorMode)
-                print("\tnBitsPerPixel: \t\t", nBitsPerPixel)
-                print("\tbytes_per_pixel: \t\t", bytes_per_pixel)
-                print()
-
-            
-            else:
-            # for monochrome camera models use Y8 mode
-                m_nColorMode = ueye.IS_CM_MONO8
-                nBitsPerPixel = ueye.INT(8)
-                bytes_per_pixel = int(nBitsPerPixel / 8)
-                print("else")
-            
-            nRet = ueye.is_AOI(hCam, ueye.IS_AOI_IMAGE_GET_AOI, rectAOI, ueye.sizeof(rectAOI))
-            if nRet != ueye.IS_SUCCESS:
-                print("is_AOI ERROR")
-
-            width = rectAOI.s32Width
-            height = rectAOI.s32Height
-
-            print("Camera model:\t\t", sInfo.strSensorName.decode('utf-8'))
-            print("Camera serial no.:\t", cInfo.SerNo.decode('utf-8'))
-            print("Maximum image width:\t", width)
-            print("Maximum image height:\t", height)
-            print()
-
-            nRet = ueye.is_AllocImageMem(hCam, width, height, nBitsPerPixel, pcImageMemory, MemID)
-            if nRet != ueye.IS_SUCCESS:
-                print("is_AllocImageMem ERROR")
-            else:
-                # Makes the specified image memory the active memory
-                nRet = ueye.is_SetImageMem(hCam, pcImageMemory, MemID)
-                if nRet != ueye.IS_SUCCESS:
-                    print("is_SetImageMem ERROR")
-                else:
-                    # Set the desired color mode
-                    nRet = ueye.is_SetColorMode(hCam, m_nColorMode)
-
-            # Activates the camera's live video mode (free run mode)
-            nRet = ueye.is_CaptureVideo(hCam, ueye.IS_DONT_WAIT)
-            if nRet != ueye.IS_SUCCESS:
-                print("is_CaptureVideo ERROR")
-
-            # Enables the queue mode for existing image memory sequences
-            nRet = ueye.is_InquireImageMem(hCam, pcImageMemory, MemID, width, height, nBitsPerPixel, pitch)
-            if nRet != ueye.IS_SUCCESS:
-                print("is_InquireImageMem ERROR")
-            else:
-                print("Press q to leave the programm")
-
-            
-
-            while(nRet == ueye.IS_SUCCESS):
-
-                array = ueye.get_data(pcImageMemory, width, height, nBitsPerPixel, pitch, copy=False)
-                frame = np.reshape(array,(height.value, width.value, bytes_per_pixel))
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                frame = cv2.resize(frame,(0,0),fx=0.5, fy=0.5)
-                results = model(frame)
-
-                annotated_frame = results[0].plot()  # Use result[0].plot() to annotate the frame
-
-                _, buffer = cv2.imencode('.jpg', annotated_frame)
-
-                # Convert frame to bytes for streaming
-                frame_bytes = buffer.tobytes()
-                
-                yield (b'--frame\r\n'
-                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-                
+                        # Convert frame to bytes for streaming
+                        frame_bytes = buffer.tobytes()
+                        
+                        yield (b'--frame\r\n'
+                            b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+                    
 
         return StreamingHttpResponse(generate_frames(), content_type='multipart/x-mixed-replace; boundary=frame')
+    
     #return HttpResponse('Invalid request method', status=405)
 
 
@@ -504,141 +417,40 @@ from anomalib.deploy import TorchInferencer
 from anomalib.post_processing import Visualizer
 
 
-def webcam(request):
-    return render(request, 'webcam_app/anomalib_webcam.html')
-
+#def webcam(request):
+#    return render(request, 'webcam_app/anomalib_webcam.html')
+@require_http_methods(["GET", "POST"])
 def anomalib_cam(request):
-        inferencer = TorchInferencer(path='C:\\Users\\asad3\\Documents\\xis\\usaisoft-platform-backend\\results\\cfa\\Paper\\run\\weights\\torch\\model.pt', device='auto')
+        
+        model_path = request.FILES.get('model')  # Change 'model_path' to 'model'
+        print(model_path)
+        current_directory = os.getcwd()
+        model_filename = model_path.name
+        model_asd = os.path.join(current_directory, model_filename)
+        with open(model_asd, 'wb') as destination:
+            for chunk in model_path.chunks():
+                destination.write(chunk)
+        print(f'Model file received and saved at: {model_asd}')
+        
+        inferencer = TorchInferencer(path=model_asd, device='auto')
         visualizer = Visualizer(mode='simple', task='segmentation')
     #if request.method == 'POST' or request.method == 'GET':
         def generate_frames():
 
-            hCam = ueye.HIDS(0)             #0: first available camera;  1-254: The camera with the specified camera ID
-            sInfo = ueye.SENSORINFO()
-            cInfo = ueye.CAMINFO()
-            pcImageMemory = ueye.c_mem_p()
-            MemID = ueye.int()
-            rectAOI = ueye.IS_RECT()
-            pitch = ueye.INT()
-            nBitsPerPixel = ueye.INT(24)    #24: bits per pixel for color mode; take 8 bits per pixel for monochrome
-            channels = 3                    #3: channels for color mode(RGB); take 1 channel for monochrome
-            m_nColorMode = ueye.INT()		# Y8/RGB16/RGB24/REG32
-            bytes_per_pixel = int(nBitsPerPixel / 8)
+            cap = cv2.VideoCapture(0) 
+            while cap.isOpened():
+                success, frame = cap.read()
+                if success:
 
-            nRet = ueye.is_InitCamera(hCam, None)
-            if nRet != ueye.IS_SUCCESS:
-                print("is_InitCamera ERROR")
+                    predictions = inferencer.predict(frame)
+                    annotated_frame = visualizer.visualize_image(predictions) 
 
-            nRet = ueye.is_GetCameraInfo(hCam, cInfo)
-            if nRet != ueye.IS_SUCCESS:
-                print("is_GetCameraInfo ERROR")
+                    _, buffer = cv2.imencode('.jpg', annotated_frame)
 
-            nRet = ueye.is_GetSensorInfo(hCam, sInfo)
-            if nRet != ueye.IS_SUCCESS:
-                print("is_GetSensorInfo ERROR")
-
-            nRet = ueye.is_ResetToDefault( hCam)
-            if nRet != ueye.IS_SUCCESS:
-                print("is_ResetToDefault ERROR")
-
-            nRet = ueye.is_SetDisplayMode(hCam, ueye.IS_SET_DM_DIB)
-
-            if int.from_bytes(sInfo.nColorMode.value, byteorder='big') == ueye.IS_COLORMODE_BAYER:
-            # setup the color depth to the current windows setting
-                ueye.is_GetColorDepth(hCam, nBitsPerPixel, m_nColorMode)
-                bytes_per_pixel = int(nBitsPerPixel / 8)
-                print("IS_COLORMODE_BAYER: ", )
-                print("\tm_nColorMode: \t\t", m_nColorMode)
-                print("\tnBitsPerPixel: \t\t", nBitsPerPixel)
-                print("\tbytes_per_pixel: \t\t", bytes_per_pixel)
-                print()
-
-            elif int.from_bytes(sInfo.nColorMode.value, byteorder='big') == ueye.IS_COLORMODE_CBYCRY:
-                # for color camera models use RGB32 mode
-                m_nColorMode = ueye.IS_CM_BGRA8_PACKED
-                nBitsPerPixel = ueye.INT(32)
-                bytes_per_pixel = int(nBitsPerPixel / 8)
-                print("IS_COLORMODE_CBYCRY: ", )
-                print("\tm_nColorMode: \t\t", m_nColorMode)
-                print("\tnBitsPerPixel: \t\t", nBitsPerPixel)
-                print("\tbytes_per_pixel: \t\t", bytes_per_pixel)
-                print()
-
-            elif int.from_bytes(sInfo.nColorMode.value, byteorder='big') == ueye.IS_COLORMODE_MONOCHROME:
-                # for color camera models use RGB32 mode
-                m_nColorMode = ueye.IS_CM_MONO8
-                nBitsPerPixel = ueye.INT(8)
-                bytes_per_pixel = int(nBitsPerPixel / 8)
-                print("IS_COLORMODE_MONOCHROME: ", )
-                print("\tm_nColorMode: \t\t", m_nColorMode)
-                print("\tnBitsPerPixel: \t\t", nBitsPerPixel)
-                print("\tbytes_per_pixel: \t\t", bytes_per_pixel)
-                print()
-
-            
-            else:
-            # for monochrome camera models use Y8 mode
-                m_nColorMode = ueye.IS_CM_MONO8
-                nBitsPerPixel = ueye.INT(8)
-                bytes_per_pixel = int(nBitsPerPixel / 8)
-                print("else")
-            
-            nRet = ueye.is_AOI(hCam, ueye.IS_AOI_IMAGE_GET_AOI, rectAOI, ueye.sizeof(rectAOI))
-            if nRet != ueye.IS_SUCCESS:
-                print("is_AOI ERROR")
-
-            width = rectAOI.s32Width
-            height = rectAOI.s32Height
-
-            print("Camera model:\t\t", sInfo.strSensorName.decode('utf-8'))
-            print("Camera serial no.:\t", cInfo.SerNo.decode('utf-8'))
-            print("Maximum image width:\t", width)
-            print("Maximum image height:\t", height)
-            print()
-
-            nRet = ueye.is_AllocImageMem(hCam, width, height, nBitsPerPixel, pcImageMemory, MemID)
-            if nRet != ueye.IS_SUCCESS:
-                print("is_AllocImageMem ERROR")
-            else:
-                # Makes the specified image memory the active memory
-                nRet = ueye.is_SetImageMem(hCam, pcImageMemory, MemID)
-                if nRet != ueye.IS_SUCCESS:
-                    print("is_SetImageMem ERROR")
-                else:
-                    # Set the desired color mode
-                    nRet = ueye.is_SetColorMode(hCam, m_nColorMode)
-
-            # Activates the camera's live video mode (free run mode)
-            nRet = ueye.is_CaptureVideo(hCam, ueye.IS_DONT_WAIT)
-            if nRet != ueye.IS_SUCCESS:
-                print("is_CaptureVideo ERROR")
-
-            # Enables the queue mode for existing image memory sequences
-            nRet = ueye.is_InquireImageMem(hCam, pcImageMemory, MemID, width, height, nBitsPerPixel, pitch)
-            if nRet != ueye.IS_SUCCESS:
-                print("is_InquireImageMem ERROR")
-            else:
-                print("Press q to leave the programm")
-
-            
-
-            while(nRet == ueye.IS_SUCCESS):
-
-                array = ueye.get_data(pcImageMemory, width, height, nBitsPerPixel, pitch, copy=False)
-                frame = np.reshape(array,(height.value, width.value, bytes_per_pixel))
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                frame = cv2.resize(frame,(0,0),fx=0.5, fy=0.5)
-
-                predictions = inferencer.predict(frame)
-                annotated_frame = visualizer.visualize_image(predictions) 
-                _, buffer = cv2.imencode('.jpg', annotated_frame)
-
-                frame_bytes = buffer.tobytes()
-                
-                
-                yield (b'--frame\r\n'
-                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-        
+                    frame_bytes = buffer.tobytes()
+                    
+                    yield (b'--frame\r\n'
+                        b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
 
         return StreamingHttpResponse(generate_frames(), content_type='multipart/x-mixed-replace; boundary=frame')

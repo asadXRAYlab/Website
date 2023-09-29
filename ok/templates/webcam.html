@@ -7,6 +7,13 @@
 
 <body>
     <h1>Webcam Feed</h1>
+    
+    
+    <form method="post" enctype="multipart/form-data" action="{% url 'video_feed' %}">
+        {% csrf_token %}
+        <input type="file" name="model_path">
+        <button type="submit">Run Model</button>
+    </form>
     <img src="{% url 'video_feed' %}" alt="Webcam Feed">
 </body>
 

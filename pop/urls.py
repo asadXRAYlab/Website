@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from ok.views import yolo, home, yolo_api, anomaly_detection_api,anomalib_cam, process_directory, train_yolo, train_anomaly_detection, video_feed
+from ok.views import yolo, home, yolo_api, anomaly_detection_api,anomalib_cam, process_directory, train_yolo, train_anomaly_detection, run
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', home, name='home'),
@@ -14,7 +14,7 @@ urlpatterns = [
     path('process_directory/', process_directory, name='process_directory'),
     path('train/', train_yolo, name='train_yolo'),
     path('train_anomaly_detection/', train_anomaly_detection, name='train_anomaly_detection'),
-    path('video_feed/',video_feed, name='video_feed'),
+    path('video_feed/',run, name='video_feed'),
     path('anomalib_cam/',anomalib_cam, name='anomalib_cam'),
     
 
