@@ -115,6 +115,7 @@ def train_yolo(request):
             results = model.train(
                 data=yaml_path,
                 epochs=int(epoch),
+                patience=6,
                 imgsz=256
             )
 
