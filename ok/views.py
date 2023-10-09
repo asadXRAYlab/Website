@@ -1,30 +1,34 @@
-from django.shortcuts import render
-from django.http import JsonResponse, StreamingHttpResponse
-from django.http import HttpResponse
-# Create your views here.
-from .torch_inference import infer
-from django.views.decorators.csrf import csrf_exempt
-from django.core.serializers.json import DjangoJSONEncoder
-import numpy as np
-import cv2.dnn
+import io
 import cv2
-from ultralytics.utils import ROOT, yaml_load
-from ultralytics.utils.checks import check_yaml
+import time
 import os
-import tempfile
-import subprocess
-from roboflow import Roboflow
-from ultralytics import YOLO
+import base64
 import shutil
 import random
 import yaml
+import tempfile
+import numpy as np
+import subprocess
+from PIL import Image
+from ultralytics import YOLO
+from django.shortcuts import render
+from django.http import HttpResponseBadRequest, JsonResponse
+from .torch_inference import infer
+from ultralytics.utils import ROOT, yaml_load
+from ultralytics.utils.checks import check_yaml
 from .anomaly_training import train
 from argparse import Namespace
+from anomalib.deploy import TorchInferencer
+from anomalib.post_processing import Visualizer
+from django.http import HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from django.core.serializers.json import DjangoJSONEncoder
+from django.http import StreamingHttpResponse, HttpResponseServerError
 
 
-  ############################################################################################################################
-                                      
-                                       ######### Yolo Inference ##############
+
+
 
 
 def yolo(image_bytes, model_path):
@@ -77,9 +81,6 @@ def yolo_api(request):
         return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
 
 
-#############################################################################################################################
-                                        
-                                        ##### Yolo Training #####
 
 def train_yolo(request):
     if request.method == 'POST':
@@ -144,22 +145,7 @@ def train_yolo(request):
 
 
 
-################################################################################################################################
 
-                                                ##### Anomaly detection Inference #####
-
-import os
-import numpy as np
-from PIL import Image
-import tempfile
-import base64
-import io
-import numpy as np
-import io
-import base64
-from PIL import Image
-import io
-import torch
 
 def anomaly_detection_api(request):
     if request.method == 'POST':
@@ -217,9 +203,8 @@ def anomaly_detection_api(request):
 
 
 
-##############################################################################################################################
 
-                                   ##### Anomaly Detection Training #####
+
 
 
 def train_anomaly_detection(request):
@@ -247,9 +232,8 @@ def train_anomaly_detection(request):
 
 
 
-##############################################################################################################################
 
-                                         ##### Creating YAML File #####
+                                    
 
 
 def create_subfolders(base_dir):
@@ -351,107 +335,154 @@ def process_directory(request):
     else:
         return JsonResponse({'status': 'error', 'message': 'Invalid request method.'})
     
-##############################################################################################################################
+
 
 
 
 def home(request):
   
-
     return HttpResponse("Home function executed successfully!")
 
 
-############################################################################################################################
 
-# myapp/views.py
+@require_http_methods(["GET", "POST"])
+def model_upload_yolo(request):
+    try:
+        if request.method == 'POST':
+            model_file = request.FILES.get('model_file')
+            if model_file is None:
+                return HttpResponseBadRequest("No model file uploaded.")
+            
+            model_filename = 'yolo.pt'
+            model_path = os.path.join(os.getcwd(), model_filename)
 
-from django.http import HttpResponse
-from django.views.decorators.http import require_http_methods
-import cv2
-import time
+            with open(model_path, 'wb') as destination:
+                for chunk in model_file.chunks():
+                    destination.write(chunk)
+
+            print(f'Model file received and saved at: {model_path}')
+            return HttpResponse("Model file uploaded successfully.")
+        return HttpResponse()
+    except Exception as e:
+        print(str(e))  
+        return HttpResponseServerError("Internal Server Error")
 
 
+@require_http_methods(["GET", "POST"])
+def yolo_webcam(request):
+    try:
+        model = YOLO('./yolo.pt')  
+        def generate_frames():
+            cap = cv2.VideoCapture(0)
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+
+                if model is not None:  # Check if model is initialized
+                    results = model(frame)
+                    annotated_frame = results[0].plot()
+                    _, buffer = cv2.imencode('.jpg', annotated_frame)
+                    frame = buffer.tobytes()
+
+                    yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")
+                
+
+        response = StreamingHttpResponse(
+            generate_frames(),
+            content_type="multipart/x-mixed-replace; boundary=frame",
+        )
+        return response
+    except Exception as e:
+        print(str(e))  
+        return HttpResponseServerError("Internal Server Error")
+
+    #return render(request, 'Yolo_live_inference.html')
+
+
+@require_http_methods(["GET", "POST"])
+def model_upload_anomalib(request):
+    try:
+        if request.method == 'POST':
+            model_file = request.FILES.get('model_file')
+            if model_file is None:
+                return HttpResponseBadRequest("No model file uploaded.")
+            
+            model_filename = 'anomalib.pt'
+            model_path = os.path.join(os.getcwd(), model_filename)
+
+            with open(model_path, 'wb') as destination:
+                for chunk in model_file.chunks():
+                    destination.write(chunk)
+
+            print(f'Model file received and saved at: {model_path}')
+            return HttpResponse("Model file uploaded successfully.")
+        return HttpResponse()
+    except Exception as e:
+        print(str(e))  
+        return HttpResponseServerError("Internal Server Error")
+
+
+@require_http_methods(["GET", "POST"])
+def anomalib_webcam(request):
+    try:
+        model_asd='anomalib.pt'
+        
+        inferencer = TorchInferencer(path=model_asd, device='auto')
+        visualizer = Visualizer(mode='simple', task='segmentation')
+            
+        def generate_frames():
+            cap = cv2.VideoCapture(0)
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                
+                predictions = inferencer.predict(frame)
+                annotated_frame = visualizer.visualize_image(predictions)
+                _, buffer = cv2.imencode('.jpg', annotated_frame)
+                frame = buffer.tobytes()
+
+                yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")
+                time.sleep(0.1)
+        response = StreamingHttpResponse(
+            generate_frames(),
+            content_type="multipart/x-mixed-replace; boundary=frame",
+        )
+
+        return response
+    except Exception as e:
+        print(str(e))
+        return HttpResponseServerError("Internal Server Error")
+    
+    #return render(request, 'Anomalib_live_inference.html')
 
 
 
 
 @require_http_methods(["GET", "POST"])
-def run(request):
-    if request.method == "POST":
-        model_path = request.FILES.get('model')
-        
-        if model_path:
-            # Process the uploaded model file
-            current_directory = os.getcwd()
-            model_filename = model_path.name
-            model_asd = os.path.join(current_directory, model_filename)
-            
-            with open(model_asd, 'wb') as destination:
-                for chunk in model_path.chunks():
-                    destination.write(chunk)
-            
-            print(f'Model file received and saved at: {model_asd}')
-            model = YOLO(model_asd)
+def live_webcam(request):
+    try:
+        def generate_frames():
+            cap = cv2.VideoCapture(0)
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                
+                _, buffer = cv2.imencode('.jpg', frame)
+                frame = buffer.tobytes()
 
-            def generate_frames():
-                cap = cv2.VideoCapture(0)
-                while cap.isOpened():
-                    success, frame = cap.read()
-                    if success:
-                        results = model(frame)
-                        annotated_frame = results[0].plot()
-                        _, buffer = cv2.imencode('.jpg', annotated_frame)
-                        frame_bytes = buffer.tobytes()
-                        yield (b'--frame\r\n'
-                               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-
-            return StreamingHttpResponse(generate_frames(), content_type='multipart/x-mixed-replace; boundary=frame')
-    
-    # Render the initial form page for GET requests
-    return render(request, 'Yolo_live_inference.html')
-
-
-from anomalib.deploy import TorchInferencer
-from anomalib.post_processing import Visualizer
+                yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")
+                time.sleep(0.1)
+        response = StreamingHttpResponse(
+            generate_frames(),
+            content_type="multipart/x-mixed-replace; boundary=frame",
+        )
+        return response
+    except Exception as e:
+        print(str(e))
+        return HttpResponseServerError("Internal Server Error")
 
 
 
-@require_http_methods(["GET", "POST"])
-def anomalib_cam(request):
-    if request.method == "POST":
-        model_path = request.FILES.get('model')
-        
-        if model_path:
-            # Process the uploaded model file
-            current_directory = os.getcwd()
-            model_filename = model_path.name
-            model_asd = os.path.join(current_directory, model_filename)
-            
-            with open(model_asd, 'wb') as destination:
-                for chunk in model_path.chunks():
-                    destination.write(chunk)
-            
-            print(f'Model file received and saved at: {model_asd}')
-        
-            inferencer = TorchInferencer(path=model_asd, device='auto')
-            visualizer = Visualizer(mode='simple', task='segmentation')
-            
-            def generate_frames():
-                cap = cv2.VideoCapture(0) 
-                while cap.isOpened():
-                    success, frame = cap.read()
-                    if success:
-
-                        predictions = inferencer.predict(frame)
-                        annotated_frame = visualizer.visualize_image(predictions) 
-
-                        _, buffer = cv2.imencode('.jpg', annotated_frame)
-
-                        frame_bytes = buffer.tobytes()
-                        
-                        yield (b'--frame\r\n'
-                            b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-
-        return StreamingHttpResponse(generate_frames(), content_type='multipart/x-mixed-replace; boundary=frame')
-    
-    return render(request, 'Anomalib_live_inference.html')

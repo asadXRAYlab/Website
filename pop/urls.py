@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from ok.views import yolo, home, yolo_api, anomaly_detection_api,anomalib_cam, process_directory, train_yolo, train_anomaly_detection, run
+from ok.views import yolo, home, yolo_api, live_webcam, model_upload_anomalib, model_upload_yolo, anomaly_detection_api,anomalib_webcam, process_directory, train_yolo, train_anomaly_detection, yolo_webcam
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', home, name='home'),
@@ -14,8 +14,13 @@ urlpatterns = [
     path('process_directory/', process_directory, name='process_directory'),
     path('train/', train_yolo, name='train_yolo'),
     path('train_anomaly_detection/', train_anomaly_detection, name='train_anomaly_detection'),
-    path('video_feed/',run, name='video_feed'),
-    path('anomalib_cam/',anomalib_cam, name='anomalib_cam'),
+    path('yolo_webcam/',yolo_webcam, name='yolo_webcam'),
+    path('anomalib_webcam/',anomalib_webcam, name='anomalib_webcam'),
+    path('live_webcam/',live_webcam, name='live_webcam'),
+    path('model_upload_yolo/',model_upload_yolo, name='model_upload_yolo'),
+    path('model_upload_anomalib/',model_upload_anomalib, name='model_upload_anomalib'),
+    
+
     
 
     # include other app URLs if needed
