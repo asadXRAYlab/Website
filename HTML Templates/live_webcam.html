@@ -1,0 +1,33 @@
+<!-- HTML file on your local machine -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Webcam Capture</title>
+</head>
+<body>
+    <h1>Webcam Capture</h1>
+    <div>
+        <img id="webcam-stream" src="http://127.0.0.1:8000/webcam/" alt="Webcam Stream">
+    </div>
+    <button id="capture-button">Capture Frame</button>
+
+    <script>
+        const captureButton = document.getElementById('capture-button');
+
+        captureButton.addEventListener('click', () => {
+            // Send a POST request to capture the frame
+            fetch('http://127.0.0.1:8000/webcam/', { method: 'POST' })
+                .then(response => {
+                    if (response.ok) {
+                        console.log('Frame captured successfully.');
+                    } else {
+                        console.error('Error capturing frame.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error capturing frame: ', error);
+                });
+        });
+    </script>
+</body>
+</html>

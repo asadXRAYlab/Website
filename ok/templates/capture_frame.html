@@ -1,0 +1,35 @@
+<!-- capture_frame.html -->
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Capture Frame</title>
+</head>
+
+<body>
+    <h1>Capture Frame</h1>
+    <button id="capture-button">Capture Frame</button>
+
+    <script>
+        const captureButton = document.getElementById('capture-button');
+
+        captureButton.addEventListener('click', () => {
+            // Send a POST request to capture the frame
+            fetch('/capture-frame-and-stream/', {
+                    method: 'POST'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        alert('Frame captured successfully.');
+                    } else {
+                        alert('Error capturing frame.');
+                    }
+                })
+                .catch(error => {
+                    alert('Error capturing frame: ' + error);
+                });
+        });
+    </script>
+</body>
+
+</html>

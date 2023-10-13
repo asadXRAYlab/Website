@@ -1,0 +1,6 @@
+train: C:\Users\asad3\Downloads\yoloproject\try22/train/images
+val: C:\Users\asad3\Downloads\yoloproject\try22/valid/images
+test: C:\Users\asad3\Downloads\yoloproject\try22/test/images
+
+nc: 2
+names: ['middle', 'outter']

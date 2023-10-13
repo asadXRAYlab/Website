@@ -1,8 +1,8 @@
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
-from ok.views import yolo, home, yolo_api, live_webcam, model_upload_anomalib, model_upload_yolo, anomaly_detection_api,anomalib_webcam, process_directory, train_yolo, train_anomaly_detection, yolo_webcam
+from ok.views import yolo, home, yolo_api, webcam,webcam_industrial,anomalib_industrial,yolo_industrial, model_upload_anomalib, model_upload_yolo, anomaly_detection_api,anomalib_webcam, process_directory, train_yolo, train_anomaly_detection, yolo_webcam
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', home, name='home'),
@@ -16,12 +16,13 @@ urlpatterns = [
     path('train_anomaly_detection/', train_anomaly_detection, name='train_anomaly_detection'),
     path('yolo_webcam/',yolo_webcam, name='yolo_webcam'),
     path('anomalib_webcam/',anomalib_webcam, name='anomalib_webcam'),
-    path('live_webcam/',live_webcam, name='live_webcam'),
     path('model_upload_yolo/',model_upload_yolo, name='model_upload_yolo'),
     path('model_upload_anomalib/',model_upload_anomalib, name='model_upload_anomalib'),
-    
+    path('webcam/', webcam, name='webcam'),
+    path('webcam_industrial/', webcam_industrial, name='webcam_industrial'),
+    path('anomalib_industrial/', anomalib_industrial, name='anomalib_industrial'),
+    path('yolo_industrial/', yolo_industrial, name='yolo_industrial'),
 
-    
 
     # include other app URLs if needed
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

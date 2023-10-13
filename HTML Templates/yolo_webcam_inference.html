@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>YOLO Model Upload and Webcam Stream</title>
+</head>
+<body>
+    <h1>Upload YOLO Model</h1>
+    <form id="modelForm" action="http://127.0.0.1:8000/model_upload_yolo/" method="POST" enctype="multipart/form-data">
+        <label for="model_file">Select a YOLO model file (.pt):</label><br>
+        <input type="file" name="model_file" accept=".pt" required><br><br>
+        <input type="submit" value="Upload Model">
+    </form>
+    <hr>
+    <h2>Image Frames:</h2>
+    <div id="imageContainer"></div>
+    <script>
+        const video = document.getElementById('video');
+        const modelForm = document.getElementById('modelForm');
+
+        modelForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+
+            
+
+            fetch('http://127.0.0.1:8000/model_upload_yolo/', {
+                method: 'POST',
+                body: formData
+            })
+            
+            const image = document.createElement("img");
+            image.src = "http://127.0.0.1:8000/yolo_webcam/";
+            imageContainer.appendChild(image);
+        
+            
+        });
+
+        
+    </script>
+</body>
+</html>

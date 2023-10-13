@@ -42,8 +42,8 @@ INSTALLED_APPS = [
 ]
 #'django.middleware.csrf.CsrfViewMiddleware',
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.security.SecurityMiddleware',
     'django.middleware.common.CommonMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -133,3 +133,5 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 #<img src="{{ STATIC_URL }}output.jpg" alt="Detections">
 
 CORS_ALLOW_ALL_ORIGINS = True
+
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
