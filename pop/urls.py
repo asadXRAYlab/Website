@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
-from ok.views import yolo, home, yolo_api, webcam,webcam_industrial,anomalib_industrial,yolo_industrial, model_upload_anomalib, model_upload_yolo, anomaly_detection_api,anomalib_webcam, process_directory, train_yolo, train_anomaly_detection, yolo_webcam
+from ok.views import yolo, home, yolo_api,anomalib_config,yolo_csv, webcam, model_upload_anomalib, model_upload_yolo, anomaly_detection_api,anomalib_webcam, process_directory, train_yolo, train_anomaly_detection, yolo_webcam
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', home, name='home'),
@@ -19,9 +19,9 @@ urlpatterns = [
     path('model_upload_yolo/',model_upload_yolo, name='model_upload_yolo'),
     path('model_upload_anomalib/',model_upload_anomalib, name='model_upload_anomalib'),
     path('webcam/', webcam, name='webcam'),
-    path('webcam_industrial/', webcam_industrial, name='webcam_industrial'),
-    path('anomalib_industrial/', anomalib_industrial, name='anomalib_industrial'),
-    path('yolo_industrial/', yolo_industrial, name='yolo_industrial'),
+    path('anomalib_config/', anomalib_config, name='anomalib_config'),
+    path('yolo_csv/', yolo_csv, name='yolo_csv'),
+
 
 
     # include other app URLs if needed
