@@ -52,7 +52,7 @@ MIDDLEWARE = [
     
 ]
 
-ROOT_URLCONF = 'pop.urls'
+ROOT_URLCONF = 'project.urls'
 
 TEMPLATES = [
     {
@@ -70,7 +70,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'pop.wsgi.application'
+WSGI_APPLICATION = 'project.wsgi.application'
 
 
 # Database

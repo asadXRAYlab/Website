@@ -58,7 +58,6 @@ enum-compat==0.0.3
 expiringdict==1.2.2
 filelock==3.12.2
 fire==0.5.0
-Flask==1.1.2
 flatbuffers==23.5.26
 fonttools==4.41.0
 FrEIA==0.2
@@ -228,3 +227,4 @@ xmljson==0.2.0
 yarl==1.9.2
 yolov5==7.0.12
 yolov8==0.0.2
+

@@ -4,7 +4,6 @@ import json
 import cv2
 import time
 import os
-import base64
 import shutil
 import random
 import yaml
@@ -12,15 +11,13 @@ import tempfile
 import pandas as pd
 from typing import List
 import numpy as np
-import subprocess
 from PIL import Image
 from ultralytics import YOLO
 from datetime import datetime
 from django.shortcuts import render
 from django.http import HttpResponseBadRequest, JsonResponse
 from .torch_inference import infer
-from ultralytics.utils import ROOT, yaml_load
-from ultralytics.utils.checks import check_yaml
+from ultralytics.utils import ROOT
 from .anomaly_training import train
 from argparse import Namespace
 from anomalib.deploy import TorchInferencer
@@ -90,77 +87,72 @@ def yolo_api(request):
 def train_yolo(request):
     if request.method == 'POST':
         try:
-            yaml_file = request.FILES.get('yaml_file')
-            if not yaml_file:
-                return JsonResponse({'status': 'error', 'message': 'No YAML file uploaded'})
-            dataset_path = request.POST.get('dataset_path')
-            if not dataset_path:
-                return JsonResponse({'status': 'error', 'message': 'No dataset path provided'})
-            training_speed = request.POST.get('training_speed')
-            print("Selected Training Speed:", training_speed)
-            upload_dir = './model_results'  # Change this to your desired upload directory
-            os.makedirs(upload_dir, exist_ok=True)
-            yaml_path = os.path.join(upload_dir, yaml_file.name)
-            with open(yaml_path, 'wb') as f:
-                for chunk in yaml_file.chunks():
+            zip_file = request.FILES.get('zip_file')
+            if not zip_file:
+                return JsonResponse({'status': 'error', 'message': 'No ZIP file uploaded'})
+
+            # Create a directory for permanent storage if not exists
+            storage_dir = os.path.join(os.getcwd(), 'Yolo Training Dataset')
+            os.makedirs(storage_dir, exist_ok=True)
+
+            # Save the uploaded ZIP file permanently
+            zip_path = os.path.join(storage_dir, zip_file.name)
+            with open(zip_path, 'wb') as f:
+                for chunk in zip_file.chunks():
                     f.write(chunk)
 
-            # Read the YAML file and update paths
-            with open(yaml_path, 'r') as f:
-                yaml_content = f.read()
-            updated_yaml_content = yaml_content.replace('../train/images', f'{dataset_path}/train/images')
-            updated_yaml_content = updated_yaml_content.replace('../valid/images', f'{dataset_path}/valid/images')
-            updated_yaml_content = updated_yaml_content.replace('../test/images', f'{dataset_path}/test/images')
-            with open(yaml_path, 'w') as f:
-                f.write(updated_yaml_content)
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(storage_dir)
 
-            if training_speed =='fast':
+            # Find the YAML file within the extracted contents
+            yaml_file = None
+            for root, dirs, files in os.walk(storage_dir):
+                for file in files:
+                    if file.endswith('.yaml'):
+                        yaml_file = os.path.join(root, file)
+                        break
+                if yaml_file:
+                    break
+
+            if not yaml_file:
+                return JsonResponse({'status': 'error', 'message': 'No YAML file found in the ZIP archive'})
+
+            training_speed = request.POST.get('training_speed')
+            print("Selected Training Speed:", training_speed)
+            yaml_path = os.path.join(storage_dir, os.path.basename(yaml_file))
+
+            with open(yaml_file, 'r') as source:
+                source_content = source.read()
+
+            with open(yaml_path, 'w') as destination:
+                destination.write(source_content)
+
+            if training_speed == 'fast':
                 model = YOLO('yolov8n.pt')
-
-            # Training using the updated data.yaml file
-                results = model.train(
-                    data=yaml_path,
-                    epochs=50,
-                    #patience=6,
-                    imgsz=256
-                )
-
-                # Save results to directory
-                output_dir = "model_results"
-                os.makedirs(output_dir, exist_ok=True)
-                results.save(output_dir)
-
-                response_data = {
-                    'status': 'success',
-                    'message': 'Training completed successfully',
-                    'results_dir': output_dir
-                }
-
-                return JsonResponse(response_data)
-                # Rest of your YOLOv8 training code goes here...
+                epochs = 50
             else:
                 model = YOLO('yolov8m.pt')
+                epochs = 100
 
             # Training using the updated data.yaml file
-                results = model.train(
-                    data=yaml_path,
-                    epochs=100,
-                    #patience=6,
-                    imgsz=256
-                )
+            results = model.train(
+                data=yaml_path,
+                epochs=epochs,
+                imgsz=256
+            )
 
-                # Save results to directory
-                output_dir = "model_results"
-                os.makedirs(output_dir, exist_ok=True)
-                results.save(output_dir)
+            # Save results to directory
+            output_dir = "model_results"
+            os.makedirs(output_dir, exist_ok=True)
+            results.save(output_dir)
 
-                response_data = {
-                    'status': 'success',
-                    'message': 'Training completed successfully',
-                    'results_dir': output_dir
-                }
+            response_data = {
+                'status': 'success',
+                'message': 'Training completed successfully',
+                'results_dir': output_dir
+            }
 
-                return JsonResponse(response_data)
+            return JsonResponse(response_data)
 
         except Exception as e:
             error_response = {
@@ -749,21 +741,23 @@ def yolo_csv(request):
 
                     mask = rle_to_mask(rle_data, original_height, original_width)
 
-                    _, binary_mask = cv2.threshold(mask, 128, 255, cv2.THRESH_BINARY)
+                    H, W = mask.shape[0:2]
 
-                    contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    #gray_img = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+                    ret, bin_img = cv2.threshold(mask, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                    contours, _ = cv2.findContours(bin_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_TC89_KCOS)
 
-                    class_coordinates = []
-
-                    for contour in contours:
-                        points = contour.squeeze(axis=1)
-                        for point in points:
-                            x, y = point
-
-                            x_normalized = x / original_width
-                            y_normalized = y / original_height
-                            class_coordinates.extend([x_normalized, y_normalized])
-
+                    
+                    for j in contours:
+                        class_coordinates = []
+                        pre = j[0]
+                        for i in j:
+                            if abs(i[0][0] - pre[0][0]) > 1 or abs(i[0][1] - pre[0][1]) > 1:
+                                pre = i
+                                temp = list(i[0])
+                                temp[0] /= W
+                                temp[1] /= H
+                                class_coordinates.extend(temp)
                     all_coordinates.append((numerical_label, class_coordinates))
 
                 image_filename = f'{image_name}.txt'
@@ -775,9 +769,9 @@ def yolo_csv(request):
                 print(f"Coordinates for image {image_name} saved to '{image_filename}'")
         
         yaml_data = {
-            'train': '..train/images',
-            'test': '..test/images',
-            'val': '..val/images',
+            'train': '../train/images',
+            'test': '../test/images',
+            'val': '../val/images',
             'nc': len(class_labels),
             'names': [f"'{label}'" for label in class_label_names]
         }
