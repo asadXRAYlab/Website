@@ -389,36 +389,7 @@ def model_upload_yolo(request):
         return HttpResponseServerError("Internal Server Error")
 
 
-@require_http_methods(["GET", "POST"])
-def yolo_webcam(request):
-    try:
-        model = YOLO('./yolo.pt')  
-        def generate_frames():
-            cap = cv2.VideoCapture(0)
-            while True:
-                ret, frame = cap.read()
-                if not ret:
-                    break
 
-                if model is not None:  # Check if model is initialized
-                    results = model(frame)
-                    annotated_frame = results[0].plot()
-                    _, buffer = cv2.imencode('.jpg', annotated_frame)
-                    frame = buffer.tobytes()
-
-                    yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")
-                
-
-        response = StreamingHttpResponse(
-            generate_frames(),
-            content_type="multipart/x-mixed-replace; boundary=frame",
-        )
-        return response
-    except Exception as e:
-        print(str(e))  
-        return HttpResponseServerError("Internal Server Error")
-
-    #return render(request, 'Yolo_live_inference.html')
 
 
 @require_http_methods(["GET", "POST"])
@@ -444,80 +415,6 @@ def model_upload_anomalib(request):
         return HttpResponseServerError("Internal Server Error")
 
 
-@require_http_methods(["GET", "POST"])
-def anomalib_webcam(request):
-    try:
-        model_asd='anomalib.pt'
-        
-        inferencer = TorchInferencer(path=model_asd, device='auto')
-        visualizer = Visualizer(mode='simple', task='segmentation')
-            
-        def generate_frames():
-            cap = cv2.VideoCapture(0)
-            while True:
-                ret, frame = cap.read()
-                if not ret:
-                    break
-                
-                predictions = inferencer.predict(frame)
-                annotated_frame = visualizer.visualize_image(predictions)
-                _, buffer = cv2.imencode('.jpg', annotated_frame)
-                frame = buffer.tobytes()
-
-                yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")
-                time.sleep(0.1)
-        response = StreamingHttpResponse(
-            generate_frames(),
-            content_type="multipart/x-mixed-replace; boundary=frame",
-        )
-
-        return response
-    except Exception as e:
-        print(str(e))
-        return HttpResponseServerError("Internal Server Error")
-    
-    #return render(request, 'Anomalib_live_inference.html')
-
-
-
-frame_number = 0  
-capture_frame = False 
-base_directory = "./Data capture"
-timestamp = datetime.now().strftime("webcam_%Y%m%d%H%M%S")
-folder_name = f"{timestamp}"
-frame_directory = os.path.join(base_directory, folder_name)
-os.makedirs(frame_directory) 
-
-@csrf_exempt
-def webcam(request): 
-    
-    def generate_frames():
-        global frame_number, capture_frame
-        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-
-            global frame_number, capture_frame
-            if capture_frame:
-                frame_number += 1
-                frame_path = os.path.join(frame_directory, f'frame_{frame_number}.jpg')
-                cv2.imwrite(frame_path, frame)
-                capture_frame = False
-
-            _, buffer = cv2.imencode('.jpg', frame)
-            frame_data = buffer.tobytes()
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame_data + b'\r\n')
-
-    if request.method == 'POST':
-        global capture_frame
-        capture_frame = True
-        return JsonResponse({'message': 'Frame capture request received'})
-
-    response = StreamingHttpResponse(generate_frames(), content_type="multipart/x-mixed-replace;boundary=frame")
-    return response
 
 
 
@@ -817,3 +714,4 @@ def yolo_csv(request):
         
     else:
         return JsonResponse({'error': 'Invalid request'}, status=400)
+    

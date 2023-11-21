@@ -1,3 +1,0 @@
-ID: 126, Keypoint Labels: car
-ID: 126, Keypoint Labels: car
-ID: 126, Keypoint Labels: car
