@@ -86,10 +86,7 @@ def yolo_api(request):
 
 def train_yolo(request):
     if request.method == 'POST':
-        try:
             zip_file = request.FILES.get('zip_file')
-            if not zip_file:
-                return JsonResponse({'status': 'error', 'message': 'No ZIP file uploaded'})
 
             # Create a directory for permanent storage if not exists
             storage_dir = os.path.join(os.getcwd(), 'Yolo Training Dataset')
@@ -154,12 +151,6 @@ def train_yolo(request):
 
             return JsonResponse(response_data)
 
-        except Exception as e:
-            error_response = {
-                'status': 'error',
-                'message': str(e)
-            }
-            return JsonResponse(error_response)
     else:
         return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
 
@@ -170,7 +161,6 @@ def train_yolo(request):
 
 def anomaly_detection_api(request):
     if request.method == 'POST':
-        try:
             image_data = request.FILES.get('image')
 
             if image_data is None:
@@ -216,9 +206,6 @@ def anomaly_detection_api(request):
             response = HttpResponse(image_buffer.read(), content_type="image/png")
             return response 
     
-        except Exception as e:
-            error_message = str(e)
-            return JsonResponse({'error': error_message}, status=500)
 
     return JsonResponse({'error': 'Invalid request method'}, status=405)
 
@@ -231,7 +218,6 @@ def anomaly_detection_api(request):
 def train_anomaly_detection(request):
     
     if request.method == 'POST':
-        try:
             config_upload = request.FILES.get('config_path')
             with tempfile.NamedTemporaryFile(delete=False) as temp_file:
                 for chunk in config_upload.chunks():
@@ -249,8 +235,6 @@ def train_anomaly_detection(request):
             
             return JsonResponse({'status': 'Model training process initiated!'})
         
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
     
 
               
