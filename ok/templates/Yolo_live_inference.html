@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Run Model</title>
+</head>
+
+<body>
+    <h1>Upload Model File</h1>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="file" name="model">
+        <button type="submit">Run Model</button>
+    </form>
+    <br>
+    <h2>Live Video Stream:</h2>
+    <img id="video-stream" src="" alt="Video Stream">
+    <script>
+        var video = document.getElementById('video-stream');
+        var source = new EventSource("{% url 'video_feed' %}");
+        source.onmessage = function(event) {
+            video.src = 'data:image/jpeg;base64,' + event.data;
+        };
+    </script>
+</body>
+
+</html>
